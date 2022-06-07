@@ -118,14 +118,6 @@ if carbon_data=='lemma':
         y2.append(carbon_coast_surround.loc[0,'{}_b1'.format(yr)]*0.47/1000)
         y3.append(carbon_coast.loc[0,'{}_b1'.format(yr)]*0.47/1000)
 
-print('mean and stderr of carbon, projects:', np.mean(y1), np.std(y1)/np.sqrt(len(y1)))
-print('mean and stderr of carbon, surroundings:', np.mean(y2), np.std(y2)/np.sqrt(len(y2)))
-print('mean and stderr of carbon, region:', np.mean(y3), np.std(y3)/np.sqrt(len(y3)))
-
-print('slope and stderr of carbon, projects:', stats.linregress(range(len(y1)), y1).slope, stats.linregress(range(len(y1)), y1).stderr)
-print('slope and stderr of carbon, surroundings:', stats.linregress(range(len(y2)), y2).slope, stats.linregress(range(len(y2)), y2).stderr)
-print('slope and stderr of carbon, region:', stats.linregress(range(len(y3)), y3).slope, stats.linregress(range(len(y3)), y3).stderr)
-
 ax3b = ax3.twinx()  #instantiate a second axes that shares the same x-axis
 color = 'tab:blue'
 ax3b.hist(projects.start_year, bins=range(2012,2020))
@@ -145,6 +137,18 @@ ax3.set_ylim((0,149))
 ax3.text(-0.12,1,'(c)',fontsize=12, fontweight='bold', transform=ax3.transAxes)
 ax3.grid(zorder=0, linewidth=0.4, color='0.9')
 ax3.legend(fontsize=8)
+
+#print out stats for pre-project period
+y1 = y1[:-5]
+y2 = y2[:-5]
+y3 = y3[:-5]
+print('mean and stderr of carbon, coast projects:', np.mean(y1), np.std(y1)/np.sqrt(len(y1)))
+print('mean and stderr of carbon, coast surroundings:', np.mean(y2), np.std(y2)/np.sqrt(len(y2)))
+print('mean and stderr of carbon, coast region:', np.mean(y3), np.std(y3)/np.sqrt(len(y3)))
+
+print('slope and stderr of carbon, coast projects:', stats.linregress(range(len(y1)), y1).slope, stats.linregress(range(len(y1)), y1).stderr)
+print('slope and stderr of carbon, coast surroundings:', stats.linregress(range(len(y2)), y2).slope, stats.linregress(range(len(y2)), y2).stderr)
+print('slope and stderr of carbon, coast region:', stats.linregress(range(len(y3)), y3).slope, stats.linregress(range(len(y3)), y3).stderr)
 
 
 #ax4 interior: compare year-by-year timeseries for EMAPR for combined polygons surround vs projects
@@ -168,14 +172,6 @@ if carbon_data=='lemma':
         y2.append(carbon_interior_surround.loc[0,'{}_b1'.format(yr)]*0.47/1000)
         y3.append(carbon_interior.loc[0,'{}_b1'.format(yr)]*0.47/1000)
 
-print('mean and stderr of carbon, projects:', np.mean(y1), np.std(y1)/np.sqrt(len(y1)))
-print('mean and stderr of carbon, surroundings:', np.mean(y2), np.std(y2)/np.sqrt(len(y2)))
-print('mean and stderr of carbon, region:', np.mean(y3), np.std(y3)/np.sqrt(len(y3)))
-
-print('slope and stderr of carbon, projects:', stats.linregress(range(len(y1)), y1).slope, stats.linregress(range(len(y1)), y1).stderr)
-print('slope and stderr of carbon, surroundings:', stats.linregress(range(len(y2)), y2).slope, stats.linregress(range(len(y2)), y2).stderr)
-print('slope and stderr of carbon, region:', stats.linregress(range(len(y3)), y3).slope, stats.linregress(range(len(y3)), y3).stderr)
-
 ax4b = ax4.twinx()
 color = 'tab:blue'
 ax4b.set_ylabel('New projects', color=color, position=(0,0), ha='left')
@@ -193,6 +189,18 @@ ax4.set_ylim((0,149))
 ax4.text(-0.12,1,'(d)',fontsize=12, fontweight='bold', transform=ax4.transAxes)
 ax4.grid(zorder=0, linewidth=0.4, color='0.9')
 ax4.legend(fontsize=8)
+
+#print out stats for pre-project period
+y1 = y1[:-5]
+y2 = y2[:-5]
+y3 = y3[:-5]
+print('mean and stderr of carbon, interior projects:', np.mean(y1), np.std(y1)/np.sqrt(len(y1)))
+print('mean and stderr of carbon, interior surroundings:', np.mean(y2), np.std(y2)/np.sqrt(len(y2)))
+print('mean and stderr of carbon, interior region:', np.mean(y3), np.std(y3)/np.sqrt(len(y3)))
+
+print('slope and stderr of carbon, interior projects:', stats.linregress(range(len(y1)), y1).slope, stats.linregress(range(len(y1)), y1).stderr)
+print('slope and stderr of carbon, interior surroundings:', stats.linregress(range(len(y2)), y2).slope, stats.linregress(range(len(y2)), y2).stderr)
+print('slope and stderr of carbon, interior region:', stats.linregress(range(len(y3)), y3).slope, stats.linregress(range(len(y3)), y3).stderr)
 
 
 #ax5 coast: compare year-by-year timeseries for HARVEST for combined polygons surroundings vs projects

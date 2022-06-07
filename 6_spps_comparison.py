@@ -4,7 +4,7 @@
 Shane Coffield
 scoffiel@uci.edu
 
-Purpose: generate Fig 6 with tanoak/redwood species comparison for Northern Coast projects
+Purpose: generate Fig 5 with tanoak/redwood species comparison for Northern Coast projects
 
 """
 import numpy as np
@@ -119,4 +119,4 @@ ax3.text(-2.35,1,'(c)',fontweight='bold', fontsize=12)
 #ax2.set(aspect="equal")
 plt.tight_layout()
 
-plt.savefig(root + 'figures/fig6_spps_comparison.eps')
+plt.savefig(root + 'figures/fig5_spps_comparison.eps')

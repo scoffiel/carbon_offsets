@@ -61,96 +61,96 @@ gridded_lemma = gridded_lemma.where(gridded_lemma >= 0)
 #Build data table (projects)
 projects = pd.concat([projects_P, projects_T, projects_siteclass], axis=1)
 projects.columns = ['p','t','site_class']
+projects_area = pd.read_csv(root + 'all_projects.csv', index_col='project_id').area_ha
+
 
 surround = pd.concat([surround_P, surround_T, surround_siteclass], axis=1)
 surround.columns = ['p','t','site_class']
 
 
 #Build big data table (800m) -------------
-table = gridded_P.where(gridded_P > 0).to_dataframe('p').dropna().reset_index()
-del table['band']
+#two separate tables - one for coast one for interior to restrict searching
+gridded_P = {'coast': xr.open_rasterio(root + 'processed_data/prism_climate/prism_P_nonproject_coast.tiff')[0,:,:], 
+             'interior': xr.open_rasterio(root + 'processed_data/prism_climate/prism_P_nonproject_interior.tiff')[0,:,:]}
+tables = {}
+for region in gridded_P:
+    p = gridded_P[region]
 
-x = table.x.to_xarray()
-y = table.y.to_xarray()
-
-table['t'] = gridded_T.where(gridded_T > 0).sel(x=x, y=y, method='nearest').data
-
-table['site_class'] = gridded_siteclass.sel(x=x, y=y, method='nearest').data
-for i in range(1,37):
-    table['h{}'.format(1985+i)] = gridded_harvest.sel(x=x, y=y, band=i, method='nearest').data
-    if i < 33:
-        table['e{}'.format(1985+i)] = gridded_emapr.sel(x=x, y=y, band=i, method='nearest').data
-        table['l{}'.format(1985+i)] = gridded_lemma.sel(x=x, y=y, band=i, method='nearest').data
-
-table = table.dropna().reset_index(drop=True)
+    table = p.where(p > 0).to_dataframe('p').dropna().reset_index()
+    del table['band']
+    
+    x = table.x.to_xarray()
+    y = table.y.to_xarray()
+    
+    table['t'] = gridded_T.where(gridded_T > 0).sel(x=x, y=y, method='nearest').data
+    
+    table['site_class'] = gridded_siteclass.sel(x=x, y=y, method='nearest').data
+    for i in range(1,37):
+        table['h{}'.format(1985+i)] = gridded_harvest.sel(x=x, y=y, band=i, method='nearest').data
+        if i < 33:
+            table['e{}'.format(1985+i)] = gridded_emapr.sel(x=x, y=y, band=i, method='nearest').data
+            table['l{}'.format(1985+i)] = gridded_lemma.sel(x=x, y=y, band=i, method='nearest').data
+    
+    tables[region] = table.dropna().reset_index(drop=True)
 
 
 #Calculate the Mahalanobis distance ------------------------------------------
 #For each project, calculate dist to all pixels and find minimum
 #sqrt( (b-a)T corr^-1 (b-a))
+#calculate a, b, corr separately for each region
 
-a = table[['p','t','site_class']]    #(n x 3)
 
-projects = (projects-a.mean())/a.std() #standardize units
-surround = (surround-a.mean())/a.std()
-a = (a-a.mean())/a.std() 
+projects = {'coast': projects[~projects.index.isin(['CAR1066','CAR1041','CAR1092','CAR1114'])], 
+            'interior': projects[projects.index.isin(['CAR1066','CAR1041','CAR1092','CAR1114'])]}
+surround = {'coast': surround[~surround.index.isin(['CAR1066','CAR1041','CAR1092','CAR1114'])], 
+            'interior': surround[surround.index.isin(['CAR1066','CAR1041','CAR1092','CAR1114'])]}
+projects_controls = {'coast': pd.DataFrame(),
+                     'interior': pd.DataFrame()}
 
-corr = np.corrcoef(a.T)
-corrinv = np.linalg.inv(corr)
+for region in ['coast','interior']:
 
-projects_controls = pd.DataFrame()
-for p in projects.index:
-    b = projects.loc[p,['p','t','site_class']] #(1 x 3)
+    a = tables[region][['p','t','site_class']]    #(n x 3)
     
-    d = cdist(a, np.array(b).reshape(1,3), 'mahalanobis', VI=corrinv) #mahalanobis distance in T, P, siteclass space
-    #imin = np.nanargmin(d) #locations of minimum values. old way selecting a single minimum
-    #average project is 4567 ha = 4.6e7 m2 = 53 pixels (927m x 927m)
-    order = np.argsort(d, axis=None)[:50] #indices of 50 most similar pixel
+    projects[region] = (projects[region]-a.mean())/a.std() #standardize units
+    surround[region] = (surround[region]-a.mean())/a.std()
+    a = (a-a.mean())/a.std() 
     
-    projects.loc[p, 'analog_dist'] = d[order].mean()
-    #projects.loc[p, 'analog_x'] = table.loc[imin, 'x']
-    #projects.loc[p, 'analog_y'] = table.loc[imin, 'y']
+    corr = np.corrcoef(a.T)
+    corrinv = np.linalg.inv(corr)
     
-    #also, for noting in the text: calculate distance between projects and their surroundings
-    s = surround.loc[p,['p','t','site_class']]
-    ds = cdist(np.array(s).reshape(1,3), np.array(b).reshape(1,3), 'mahalanobis', VI=corrinv)
-    projects.loc[p, 'surround_dist'] = float(ds)
-    
-    projects_controls.loc[p, table.columns[-100:]] = table.iloc[order, -100:].mean() #harvest, emapr, lemma data
+    for p in projects[region].index:
+        b = projects[region].loc[p,['p','t','site_class']] #(1 x 3)
+        
+        d = cdist(a, np.array(b).reshape(1,3), 'mahalanobis', VI=corrinv) #mahalanobis distance in T, P, siteclass space
+        #imin = np.nanargmin(d) #locations of minimum values. old way selecting a single minimum
+        
+        area = projects_area.loc[p]
+        n_pixels = int(area * 10000 / 927/927)
+        #average project is 4567 ha = 4.6e7 m2 = 53 pixels (927m x 927m)
+        order = np.argsort(d, axis=None)[:n_pixels] #indices of 50 most similar pixel
+        
+        projects[region].loc[p, 'analog_dist'] = d[order].mean()
+        #projects.loc[p, 'analog_x'] = table.loc[imin, 'x']
+        #projects.loc[p, 'analog_y'] = table.loc[imin, 'y']
+        
+        #also calculate distance between projects and their surroundings for comparison
+        s = surround[region].loc[p,['p','t','site_class']]
+        ds = cdist(np.array(s).reshape(1,3), np.array(b).reshape(1,3), 'mahalanobis', VI=corrinv)
+        projects[region].loc[p, 'surround_dist'] = float(ds)
+        
+        projects_controls[region].loc[p, tables[region].columns[-100:]] = tables[region].iloc[order, -100:].mean() #harvest, emapr, lemma data
+        projects_controls[region].loc[p, 'area'] = projects_area.loc[p]
     
 
 #set up for plotting
-projects_area = pd.read_csv(root + 'all_projects.csv', index_col='project_id').area_ha
-projects_controls['area'] = projects_area
-
-
-#group into coast vs interior
-interior_projects = ['CAR1066','CAR1041','CAR1092','CAR1114']
-interior_controls = projects_controls.index.isin(interior_projects)
-interior_controls = projects_controls.loc[interior_controls, :]
-
-coast_controls = ~projects_controls.index.isin(interior_projects)
-coast_controls = projects_controls.loc[coast_controls, :]
+coast_controls = projects_controls['coast']
+interior_controls = projects_controls['interior']
+projects_controls = pd.concat([projects_controls['coast'], projects_controls['interior']])
 
 
 
-#now repeat barcharts for projects, surroundings, matched controls --------------------------------------------------------
+#repeat timeseries & barcharts for projects, surroundings, matched controls --------------------------------------------------------
 
-carbon_data = 'lemma'
-
-interior_projects = ShapelyFeature(Reader(root + "all_projects/interior_projects_4326.shp").geometries(), ccrs.PlateCarree())
-coast_projects = ShapelyFeature(Reader(root + "all_projects/coast_projects_4326_vectorized.shp").geometries(), ccrs.PlateCarree())
-
-coast_surround = ShapelyFeature(Reader(root + "processed_data/shapefiles/coast/coast_surround.shp").geometries(), ccrs.PlateCarree())
-interior_surround = ShapelyFeature(Reader(root + "processed_data/shapefiles/interior/interior_surround.shp").geometries(), ccrs.PlateCarree())
-
-#norcal = ShapelyFeature(Reader(root + "norcal_shape/norcal_shape.shp").geometries(), ccrs.PlateCarree())
-coast = ShapelyFeature(Reader(root + "processed_data/shapefiles/coast/coast.shp").geometries(), ccrs.PlateCarree())
-interior = ShapelyFeature(Reader(root + "processed_data/shapefiles/interior/interior.shp").geometries(), ccrs.PlateCarree())
-states = ShapelyFeature(Reader(root + "shapefiles/states/cb_2018_us_state_20m.shp").geometries(), ccrs.PlateCarree())
-
-
-#first panel: map of change plot with offsets overlaid
 fig = plt.figure(figsize=(7,10))
 
 grid = gs.GridSpec(3,2, height_ratios=[1,1,1])
@@ -244,7 +244,7 @@ print('slope and stderr of carbon, region:', stats.linregress(range(len(y3)), y3
 
 ax2b = ax2.twinx()  # instantiate a second axes that shares the same x-axis
 color = 'tab:blue'
-ax2b.set_ylabel('New projects', color=color, position=(0,0), ha='left')  # we already handled the x-label with ax1
+ax2b.set_ylabel('New projects', color=color, position=(0,0), ha='left') 
 ax2b.hist(projects.start_year, bins=range(2012,2020))
 ax2b.set_yticks([0,2,4,6,8])
 ax2b.set_ylim((0,22))
@@ -278,14 +278,12 @@ y2 =[] #surround
 y3 =[] #region
 y4 =[] #NEW mahalanobis matched controls
 
-
 for yr in range(1986,2018):
     y1.append(carbon_coast_projects.loc[0,'{}_b1'.format(yr)]*0.47/1000)
     y2.append(carbon_coast_surround.loc[0,'{}_b1'.format(yr)]*0.47/1000)
     y3.append(carbon_coast.loc[0,'{}_b1'.format(yr)]*0.47/1000)
     y4.append(np.average(coast_controls['l{}'.format(yr)], weights=coast_controls.area))
         
-
 print('mean and stdev of carbon, projects:', np.mean(y1), np.std(y1))
 print('mean and stdev of carbon, surrounds:', np.mean(y2), np.std(y2))
 print('mean and stdev of carbon, region:', np.mean(y3), np.std(y3))
@@ -293,7 +291,6 @@ print('mean and stdev of carbon, region:', np.mean(y3), np.std(y3))
 print('slope and stderr of carbon, projects:', stats.linregress(range(len(y1)), y1/y1[0]).slope, stats.linregress(range(len(y1)), y1/y1[0]).stderr)
 print('slope and stderr of carbon, surrounds:', stats.linregress(range(len(y2)), y2/y2[0]).slope, stats.linregress(range(len(y2)), y2/y2[0]).stderr)
 print('slope and stderr of carbon, region:', stats.linregress(range(len(y3)), y3/y3[0]).slope, stats.linregress(range(len(y3/y3[0])), y3).stderr)
-
 
 ax3.plot(range(1986,2018), y1, color='red', linewidth=2, label='Projects')
 ax3.plot(range(1986,2018), y2, color='black', linewidth=2, label='Surroundings')
@@ -326,7 +323,6 @@ for yr in range(1986,2018):
     y3.append(carbon_interior.loc[0,'{}_b1'.format(yr)]*0.47/1000)
     y4.append(np.average(interior_controls['l{}'.format(yr)], weights=interior_controls.area))
 
-
 print('mean and stdev of carbon, projects:', np.mean(y1), np.std(y1))
 print('mean and stdev of carbon, surrounds:', np.mean(y2), np.std(y2))
 print('mean and stdev of carbon, region:', np.mean(y3), np.std(y3))
@@ -335,12 +331,10 @@ print('slope and stderr of carbon, projects:', stats.linregress(range(len(y1)), 
 print('slope and stderr of carbon, surrounds:', stats.linregress(range(len(y2)), y2/y2[0]).slope, stats.linregress(range(len(y2)), y2/y2[0]).stderr)
 print('slope and stderr of carbon, region:', stats.linregress(range(len(y3)), y3/y3[0]).slope, stats.linregress(range(len(y3/y3[0])), y3).stderr)
 
-
 ax4.plot(range(1986,2018), y1, color='red', linewidth=2, label='Projects')
 ax4.plot(range(1986,2018), y2, color='black', linewidth=2, label='Surroundings')
 ax4.plot(range(1986,2018), y3, color='gray', linewidth=2, label='Interior region')
 ax4.plot(range(1986,2018), y4, color='purple', linewidth=2, label='Matched controls')
-
 
 #ax4.set_ylabel('Carbon (ton C/ha) (eMapR)')
 ax4.set_xlim((1985,2022))
@@ -409,7 +403,6 @@ ax6.grid(zorder=0, linewidth=0.4, color='0.9')
 import matplotlib.ticker as mtick
 ax6.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=0))
 
-
 y1 = np.array(y1)
 y2 = np.array(y2)
 y3 = np.array(y3)
@@ -418,7 +411,6 @@ y3 = np.array(y3)
 
 print(stats.ttest_rel(y1[:-9], y2[:-9]))
 print(stats.ttest_rel(y1[:-9], y3[:-9]))
-
 
 
 
@@ -584,7 +576,7 @@ for p in projects.index:
     m1,b1,_,_,_ = stats.linregress(x1,y1)
     m2,b2,_,_,_ = stats.linregress(x2,y2)
     projects.loc[p, 'p_value_control_lemma'] = p_val
-    
+
     #project harvest
     y1 = np.array(project_pre_harvest, dtype='float')
     y2 = np.array(project_post_harvest, dtype='float')
@@ -602,7 +594,6 @@ for p in projects.index:
     y2 = np.array(controls_post_harvest, dtype='float')
     p_val = stats.ttest_ind(y1, y2).pvalue
     projects.loc[p, 'p_value_control_harvest'] = p_val
-
 
 
 #first figure for all projects - emapr carbon, lemma carbon, and harvest proj vs surrounds (fig s3)
@@ -775,7 +766,6 @@ ax1.annotate('', xy = (i+0.08, post_n ), xycoords='data',
              xytext = (i-0.08, pre_n ), textcoords='data',
              arrowprops=dict(arrowstyle="-|>", connectionstyle="arc3", facecolor='black', ec='black'))
 ax1.text(-0.32,1.5,'*', fontsize=18, fontweight='bold')
-ax1.text(1.28,0.7,'*', fontsize=18, fontweight='bold')
 
 legend_elements = [Patch(facecolor='salmon', edgecolor='none',label='Projects, before'),
                    Patch(facecolor='red', edgecolor='none',label='Projects, after'),

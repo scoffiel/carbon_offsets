@@ -4,7 +4,7 @@
 Shane Coffield
 scoffiel@uci.edu
 
-Purpose: generate Fig 7 with harvest and species for Green Diamond and Sierra Pacific properties vs. other landholdings
+Purpose: generate Fig 6 with harvest and species for Green Diamond and Sierra Pacific properties vs. other landholdings
 
 """
 import numpy as np
@@ -186,4 +186,4 @@ ax6.text(-2,1,'(f)',fontweight='bold', fontsize=12)
 
 plt.tight_layout()
 
-plt.savefig(root + 'figures/fig7_GD-SPI-projects.eps')
+plt.savefig(root + 'figures/fig6_GD-SPI-projects.eps')

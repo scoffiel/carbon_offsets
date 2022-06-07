@@ -3,7 +3,7 @@
 """
 Bar charts for projects+surrounds before and after. Three versions
 - project-by-project eMapR, LEMMA, harvest
-- (Fig 5) landowner types eMapR, harvest
+- (Fig 7) landowner types eMapR, harvest
 - landowner types eMapR, LEMMA, harvest
 """
 import numpy as np
@@ -341,7 +341,7 @@ ax2.text(0.01,0.94,'(b)',fontweight='bold', fontsize=12, transform=ax2.transAxes
 import matplotlib.ticker as mtick
 ax2.yaxis.set_major_formatter(mtick.PercentFormatter(decimals=1))
 
-#plt.savefig(root + 'figures/fig5_before-after-barcharts.eps')
+#plt.savefig(root + 'figures/fig7_before-after-barcharts.eps')
 
 
 #3rd figure for supplement - copy of previous but including LEMMA --------------------------------------------
